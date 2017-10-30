@@ -1,7 +1,7 @@
 #ifndef CERTAIN_DBWORKER_H_
 #define CERTAIN_DBWORKER_H_
 
-#include "Certain.h"
+#include "certain/Certain.h"
 #include "IOWorker.h"
 
 namespace Certain
@@ -16,8 +16,6 @@ private:
     clsIOWorkerRouter *m_poIOWorkerRouter;
     clsDBReqQueue *m_poDBReqQueue;
     clsCertainWrapper *m_poCertain;
-
-#define MAX_BATCH_CNT 50 
 
     struct DBRoutine_t
     {
@@ -35,7 +33,7 @@ private:
 
     uint32_t m_iStartRoutineID;
 
-    void RunApplyTask(clsClientCmd *poCmd, uint64_t &iLoopCnt);
+    void RunApplyTask(clsClientCmd *poCmd, uint64_t &iPLogGetCnt);
 
 public:
     clsDBWorker(uint32_t iWorkerID, clsConfigure *poConf,

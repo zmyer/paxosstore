@@ -1,9 +1,11 @@
 *.o
 *.a
 *.so
+*.pb.h
+*.pb.cc
 
-Certain.pb.cc
-Certain.pb.h
-simple_cli
-simple_srv
-simple_st
+bench_tool
+card_srv
+card_tool
+db_tool
+rw_stress_tool

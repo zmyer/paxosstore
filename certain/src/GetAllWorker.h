@@ -1,7 +1,7 @@
 #ifndef CERTAIN_GETALL_WORKER_H_
 #define CERTAIN_GETALL_WORKER_H_
 
-#include "Certain.h"
+#include "certain/Certain.h"
 #include "IOWorker.h"
 #include "AsyncQueueMng.h"
 
@@ -37,7 +37,8 @@ private:
     }
 
 public:
-    clsGetAllWorker(uint32_t iWorkerID, clsConfigure *poConf, uint32_t iStartRoutineID) : m_iWorkerID(iWorkerID), m_poConf(poConf), m_iStartRoutineID(iStartRoutineID)
+    clsGetAllWorker(uint32_t iWorkerID, clsConfigure *poConf, uint32_t iStartRoutineID)
+        : m_iWorkerID(iWorkerID), m_poConf(poConf), m_iStartRoutineID(iStartRoutineID)
     {
         m_poQueueMng = clsAsyncQueueMng::GetInstance();
         m_poPLogEngine = clsCertainWrapper::GetInstance()->GetPLogEngine();

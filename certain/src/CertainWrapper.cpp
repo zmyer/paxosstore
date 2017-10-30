@@ -1,4 +1,4 @@
-#include "Certain.h"
+#include "certain/Certain.h"
 #include "ConnWorker.h"
 #include "EntityWorker.h"
 #include "PLogWorker.h"
@@ -26,10 +26,10 @@ int clsCertainWrapper::GetEntityInfo(uint64_t iEntityID, EntityInfo_t &tEntityIn
 
     uint64_t iMaxCommitedEntry = 0;
     uint32_t iFlag = 0;
-    iRet = m_poDBEngine->LoadMaxCommitedEntry(iEntityID, iMaxCommitedEntry, iFlag);
+    iRet = m_poDBEngine->GetEntityMeta(iEntityID, iMaxCommitedEntry, iFlag);
     if (iRet != 0)
     {
-        CertainLogError("LoadMaxCommitedEntry iEntityID %lu ret %d", iEntityID, iRet);
+        CertainLogError("GetEntityMeta iEntityID %lu ret %d", iEntityID, iRet);
     }
 
     tMeta.iMaxCommitedEntry = iMaxCommitedEntry;
@@ -70,14 +70,12 @@ int clsCertainWrapper::EntityCatchUp(uint64_t iEntityID, uint64_t &iMaxCommitedE
     uint64_t iEntry = 0;
     std::string strWriteBatch;
 
-    clsAutoEntityLock oEntityLock(iEntityID);
-
     uint32_t iFlag = 0;
     iMaxCommitedEntry = 0;
-    int iRet = m_poDBEngine->LoadMaxCommitedEntry(iEntityID, iMaxCommitedEntry, iFlag);
+    int iRet = m_poDBEngine->GetEntityMeta(iEntityID, iMaxCommitedEntry, iFlag);
     if (iRet != 0 && iRet != eRetCodeNotFound)
     {
-        CertainLogError("iEntityID %lu LoadMaxCommitedEntry ret %d", iEntityID, iRet); 
+        CertainLogError("iEntityID %lu GetEntityMeta ret %d", iEntityID, iRet); 
         return iRet;
     }
 
@@ -104,10 +102,10 @@ int clsCertainWrapper::EntityCatchUp(uint64_t iEntityID, uint64_t &iMaxCommitedE
 
         iFlag = 0;
         iMaxCommitedEntry = 0;
-        iRet = m_poDBEngine->LoadMaxCommitedEntry(iEntityID, iMaxCommitedEntry, iFlag);
+        iRet = m_poDBEngine->GetEntityMeta(iEntityID, iMaxCommitedEntry, iFlag);
         if ((iRet != 0 && iRet != eRetCodeNotFound) || iFlag != 0)
         {
-            CertainLogError("iEntityID %lu LoadMaxCommitedEntry iFlag %u ret %d",
+            CertainLogError("iEntityID %lu GetEntityMeta iFlag %u ret %d",
                     iEntityID, iFlag, iRet); 
             if (iFlag == 0)
             {
@@ -225,12 +223,6 @@ int clsCertainWrapper::CatchUpAndRunPaxos(uint64_t iEntityID,
     return iRet;
 }
 
-clsConfigure *clsCertainWrapper::GetConf()
-{
-    Assert(m_poConf != NULL);
-    return m_poConf;
-}
-
 // Abort if return error.
 int clsCertainWrapper::Init(clsCertainUserBase *poCertainUser,
         clsPLogBase *poPLogEngine, clsDBBase *poDBEngine, clsConfigure *poConf)
@@ -242,7 +234,7 @@ int clsCertainWrapper::Init(clsCertainUserBase *poCertainUser,
     m_poDBEngine = poDBEngine;
     m_poConf = poConf;
 
-    AssertEqual(CERTAIN_IO_BUFFER_SIZE, 2 * MAX_WRITEBATCH_SIZE + 2000);
+    assert(CERTAIN_IO_BUFFER_SIZE == 2 * (MAX_WRITEBATCH_SIZE + 1000));
 
     OSS::SetCertainOSSIDKey(m_poConf->GetOSSIDKey());
 
@@ -255,16 +247,6 @@ int clsCertainWrapper::Init(clsCertainUserBase *poCertainUser,
     }
 
     m_poConf->PrintAll();
-
-    if (m_poConf->GetUsePerfLog())
-    {
-        iRet = clsPerfLog::GetInstance()->Init(m_poConf->GetPerfLogPath().c_str());
-        if (iRet != 0)
-        {
-            CertainLogFatal("clsPerfLog::GetInstance()->Init ret %d", iRet);
-            return -4;
-        }
-    }
 
     iRet = poCertainUser->InitServerAddr(m_poConf);
     if (iRet != 0)
@@ -284,20 +266,20 @@ int clsCertainWrapper::Init(clsCertainUserBase *poCertainUser,
     if (iRet != 0)
     {
         CertainLogFatal("clsIOWorkerRouter::Init ret %d", iRet);
-        return -11;
+        return -7;
     }
 
     iRet = InitManagers();
     if (iRet != 0)
     {
-        return -7;
+        return -8;
     }
 
     iRet = clsCmdFactory::GetInstance()->Init(m_poConf);
     if (iRet != 0)
     {
         CertainLogFatal("clsCmdFactory::GetInstance()->Init ret %d", iRet);
-        return -8;
+        return -9;
     }
 
     clsPLogBase::InitUseTimeStat();
@@ -307,14 +289,14 @@ int clsCertainWrapper::Init(clsCertainUserBase *poCertainUser,
     if (iRet != 0)
     {
         CertainLogFatal("InitWorkers ret %d", iRet);
-        return -9;
+        return -10;
     }
 
     iRet = clsCatchUpWorker::GetInstance()->Init(m_poConf, m_poCertainUser);
     if (iRet != 0)
     {
         CertainLogFatal("clsCatchUpWorker::GetInstance()->Init ret %d", iRet);
-        return -10;
+        return -11;
     }
 
     m_vecWorker.push_back(clsCatchUpWorker::GetInstance());
@@ -331,8 +313,6 @@ void clsCertainWrapper::Destroy()
     clsCatchUpWorker::GetInstance()->Destroy();
 
     clsCmdFactory::GetInstance()->Destroy();
-
-    clsPerfLog::GetInstance()->Destroy();
 
     DestroyWorkers();
 
@@ -386,6 +366,29 @@ int clsCertainWrapper::CheckDBStatus(uint64_t iEntityID,
         iMaxContChosenEntry = poCmd->GetMaxContChosenEntry();
         iMaxChosenEntry = poCmd->GetMaxChosenEntry();
     }
+    else if (iRet != 0)
+    {
+        CertainLogError("iEntityID %lu GetMaxChosenEntry iRet %d",
+                iEntityID, iRet);
+        return iRet;
+    }
+    else if (iLeaseTimeoutMS > 0)
+    {
+        OSS::ReportLeaseWait();
+        poll(NULL, 0, iLeaseTimeoutMS);
+
+        CertainLogError("iEntityID %lu wait iLeaseTimeoutMS %lu",
+                iEntityID, iLeaseTimeoutMS);
+
+        iRet = m_poEntityGroupMng->GetMaxChosenEntry(iEntityID,
+                iMaxContChosenEntry, iMaxChosenEntry, iLeaseTimeoutMS);
+        if (iRet != 0)
+        {
+            CertainLogError("iEntityID %lu iLeaseTimeoutMS %lu ret %d",
+                    iEntityID, iLeaseTimeoutMS, iRet);
+            return iRet;
+        }
+    }
 
     // iMaxContChosenEntry may update posterior to iCommitedEntry.
     if (iMaxContChosenEntry < iCommitedEntry)
@@ -421,58 +424,6 @@ int clsCertainWrapper::CheckDBStatus(uint64_t iEntityID,
             TriggeRecover(iEntityID, iCommitedEntry);
         }
         return eRetCodeCatchUp;
-    }
-
-    if (iCommitedEntry < iMaxChosenEntry)
-    {
-        return eRetCodeDBLagBehind;
-    }
-    else if (iLeaseTimeoutMS > 0)
-    {
-        uint32_t iLocalAcceptorID = INVALID_ACCEPTOR_ID;
-        iRet = m_poCertainUser->GetLocalAcceptorID(iEntityID, iLocalAcceptorID);
-        AssertEqual(iRet, 0);
-
-        // The slave hold it, while the master go on.
-        if (iLocalAcceptorID == 1)
-        {
-            AssertNotMore(iLeaseTimeoutMS, m_poConf->GetMinLeaseMS());
-            OSS::ReportLeaseWait();
-            poll(NULL, 0, iLeaseTimeoutMS);
-        }
-        else
-        {
-            CertainLogError("Check E(%lu, %lu) iLeaseTimeoutMS %lu",
-                    iEntityID, iCommitedEntry, iLeaseTimeoutMS);
-            return eRetCodeLeaseReject;
-        }
-
-        iMaxContChosenEntry = 0;
-        iMaxChosenEntry = 0;
-        iLeaseTimeoutMS = 0;
-
-        iRet = m_poEntityGroupMng->GetMaxChosenEntry(iEntityID,
-                iMaxContChosenEntry, iMaxChosenEntry, iLeaseTimeoutMS);
-        if (iRet == eRetCodeNotFound)
-        {
-            CertainLogFatal("Check E(%lu, %lu) iLeaseTimeoutMS %lu",
-                    iEntityID, iCommitedEntry, iLeaseTimeoutMS);
-            return eRetCodeNotFound;
-        }
-
-        if (iMaxContChosenEntry < iMaxChosenEntry)
-        {
-            CertainLogError("iEntityID %lu entrys: %lu %lu %lu",
-                    iEntityID, iCommitedEntry, iMaxContChosenEntry, iMaxChosenEntry);
-            return eRetCodeCatchUp;
-        }
-
-        if (iLeaseTimeoutMS > 0)
-        {
-            CertainLogError("Check E(%lu, %lu) iLeaseTimeoutMS %lu",
-                    iEntityID, iCommitedEntry, iLeaseTimeoutMS);
-            return eRetCodeLeaseReject;
-        }
     }
 
     if (iCommitedEntry >= iMaxChosenEntry)
@@ -586,6 +537,14 @@ int clsCertainWrapper::RunPaxos(uint64_t iEntityID, uint64_t iEntry,
         CertainLogError("E(%lu, %lu) reject if learn only %u",
                 iEntityID, iEntry, m_poConf->GetEnableLearnOnly());
         return eRetCodeRejectAll;
+    }
+
+    for (uint32_t i = 0; i < vecWBUUID.size(); ++i)
+    {
+        if (clsUUIDGroupMng::GetInstance()->IsUUIDExist(iEntityID, vecWBUUID[i]))
+        {
+            return eRetCodeDupUUID;
+        }
     }
 
     // It's estimated One uint64_t uuid is 32 bytes in pb conservatively.
@@ -784,13 +743,6 @@ void clsCertainWrapper::DestroyWorkers()
     m_vecWorker.clear();
 }
 
-int clsCertainWrapper::GetMaxChosenEntry(uint64_t iEntityID,
-        uint64_t &iMaxChosenEntry)
-{
-    Assert(false);
-    return 0;
-}
-
 int clsCertainWrapper::EvictEntity(uint64_t iEntityID)
 {
     // Notify entityworker to GetAll if it is not GetAlling.
@@ -810,6 +762,35 @@ int clsCertainWrapper::EvictEntity(uint64_t iEntityID)
     return iRet;
 }
 
+bool clsCertainWrapper::CheckIfEntryDeletable(uint64_t iEntityID,
+        uint64_t iEntry, uint64_t iTimestampMS)
+{
+    uint64_t iCurrTimeMS = GetCurrTimeMS();
+    if (iCurrTimeMS < iTimestampMS + m_poConf->GetPLogExpireTimeMS())
+    {
+        return false;
+    }
+
+    uint64_t iMaxCommitedEntry = 0;
+    uint32_t iFlag = 0;
+    int iRet = m_poDBEngine->GetEntityMeta(iEntityID, iMaxCommitedEntry, iFlag);
+    if (iRet != 0)
+    {
+        CertainLogError("GetEntityMeta iEntityID %lu ret %d", iEntityID, iRet);
+        return false;
+    }
+
+    if (iMaxCommitedEntry < iEntry)
+    {
+        return false;
+    }
+
+    CertainLogImpt("E(%lu, %lu) iMaxCommitedEntry %lu",
+            iEntityID, iEntry, iMaxCommitedEntry);
+
+    return true;
+}
+
 void clsCertainWrapper::Run()
 {
     int iRet = StartWorkers();
@@ -819,10 +800,8 @@ void clsCertainWrapper::Run()
         Assert(false);
     }
 
-    CertainLogImpt("CERTAIN_SIMPLE_EXAMPLE %d, %lu workers started.",
-            CERTAIN_SIMPLE_EXAMPLE, m_vecWorker.size());
-    printf("CERTAIN_SIMPLE_EXAMPLE %d, %lu workers started.\n",
-            CERTAIN_SIMPLE_EXAMPLE, m_vecWorker.size());
+    CertainLogImpt("%lu workers started.", m_vecWorker.size());
+    printf("%lu workers started.\n", m_vecWorker.size());
 
     m_poCertainUser->OnReady();
 
@@ -860,9 +839,6 @@ void clsCertainWrapper::Run()
 
         m_poConf->LoadAgain();
 
-        bool bAsync = true;
-        clsPerfLog::GetInstance()->Flush(bAsync);
-
         if (clsThreadBase::IsStopFlag())
         {
             if (!bStopWorkersCalled)
@@ -872,7 +848,6 @@ void clsCertainWrapper::Run()
             }
             else if (CheckIfAllWorkerExited())
             {
-                clsPerfLog::GetInstance()->Destroy();
                 break;
             }
         }

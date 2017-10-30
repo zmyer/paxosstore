@@ -1,9 +1,9 @@
 #ifndef CERTAIN_INCLUDE_CERTAIN_H_
 #define CERTAIN_INCLUDE_CERTAIN_H_
 
-#include "CertainUserBase.h"
-#include "PLogBase.h"
-#include "DBBase.h"
+#include "certain/CertainUserBase.h"
+#include "certain/PLogBase.h"
+#include "certain/DBBase.h"
 
 namespace Certain
 {
@@ -61,8 +61,6 @@ public:
             clsDBBase *poDBEngine, clsConfigure *poConf);
     void Destroy();
 
-    void Run();
-
     virtual ~clsCertainWrapper() { }
 
     bool CheckIfAllWorkerExited();
@@ -79,10 +77,9 @@ public:
 
     int EntityCatchUp(uint64_t iEntityID, uint64_t &iMaxCommitedEntry);
 
-    int GetMaxChosenEntry(uint64_t iEntityID, uint64_t &iMaxChosenEntry);
-
     int GetEntityInfo(uint64_t iEntityID, EntityInfo_t &tEntityInfo, EntityMeta_t &tMeta);
 
+    clsConfigure *GetConf() { return m_poConf; }
     clsPLogBase *GetPLogEngine() { return m_poPLogEngine; }
     clsDBBase *GetDBEngine() { return m_poDBEngine; }
     clsCertainUserBase *GetCertainUser() { return m_poCertainUser; }
@@ -91,7 +88,9 @@ public:
 
     int ExplicitGetAll(uint64_t iEntityID);
 
-    clsConfigure *GetConf();
+    bool CheckIfEntryDeletable(uint64_t iEntityID, uint64_t iEntry, uint64_t iTimestampMS);
+
+    void Run();
 };
 
 } // namespace Certian

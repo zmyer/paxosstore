@@ -1,52 +1,85 @@
-#ifndef CERTAIN_EXAMPLE_SIMPLE_SIMPLEDB_H_
-#define CERTAIN_EXAMPLE_SIMPLE_SIMPLEDB_H_
+#pragma once
+#include "certain/Certain.h"
+#include "DBType.h"
 
-#include "Command.h"
-#include "Certain.h"
-#include "SimpleCmd.h"
-#include "simple/KVEngine.h"
-
-namespace Certain
+class clsSnapshotWrapper 
 {
-
-class clsDBImpl : public clsDBBase
-{
-private:
-	clsKVEngine *m_poKVEngine;
-
-	int ExcuteGet(clsSimpleCmd *poCmd);
-
-	int ExcuteSet(clsSimpleCmd *poCmd, string &strWriteBatch);
-
-	void CheckMaxCommitedEntry(uint64_t iEntityID, uint64_t iEntry);
-
 public:
-	clsDBImpl(clsKVEngine *poKVEngine) : m_poKVEngine(poKVEngine) { }
-
-	virtual ~clsDBImpl() { }
-
-	virtual int ExcuteCmd(clsClientCmd *poClientCmd, string &strWriteBatch);
-
-	virtual int Commit(uint64_t iEntityID, uint64_t iEntry,
-			const string &strWriteBatch);
-
-    virtual int MultiCommit(vector<EntryValue_t> vecEntryValue)
+    clsSnapshotWrapper(dbtype::DB *poLevelDB, const dbtype::Snapshot* poSnapshot) 
+        : m_poLevelDB(poLevelDB), m_poSnapshot(poSnapshot) 
     {
-        assert(false);
-        return 0;
+        assert(m_poLevelDB != NULL);
+        assert(m_poSnapshot != NULL);
     }
 
-	virtual int LoadMaxCommitedEntry(uint64_t iEntityID,
-			uint64_t &iCommitedEntry, uint32_t &iFlag);
-
-    virtual int GetAllAndSet(uint64_t iEntityID, uint32_t iAcceptorID,
-            uint64_t &iMaxCommitedEntry)
+    ~clsSnapshotWrapper()
     {
-        assert(false);
-        return 0;
+        assert(m_poLevelDB != NULL);
+        assert(m_poSnapshot != NULL);
+        m_poLevelDB->ReleaseSnapshot(m_poSnapshot);
     }
+
+    const dbtype::Snapshot* GetSnapshot()
+    {
+        return m_poSnapshot;
+    }
+
+    dbtype::DB *m_poLevelDB;
+    const dbtype::Snapshot *m_poSnapshot = NULL;
 };
 
-} // namespace Certain
+class clsDBImpl : public Certain::clsDBBase
+{
+private:
+    static const uint32_t kSnapshotTimeOut;
+    static const uint32_t kSnapshotCount;
 
-#endif
+    dbtype::DB *m_poLevelDB;
+
+    Certain::clsMutex m_poSnapshotMapMutex;
+    // timestmp -> (sequence, snapshot)
+    std::map<uint32_t, std::pair<uint64_t, std::shared_ptr<clsSnapshotWrapper>>> m_poSnapshotMap;
+
+public:
+    clsDBImpl(dbtype::DB *poLevelDB) : m_poLevelDB(poLevelDB) {}
+
+    virtual ~clsDBImpl() { }
+
+    virtual int Commit(uint64_t iEntityID, uint64_t iEntry, const std::string &strWriteBatch);
+
+    virtual int MultiCommit(std::vector<Certain::EntryValue_t> vecEntryValue)
+    {
+        return -1;
+    }
+
+    virtual int GetEntityMeta(uint64_t iEntityID, uint64_t &iMaxCommitedEntry, uint32_t &iFlag);
+
+    virtual int GetAllAndSet(uint64_t iEntityID, uint32_t iAcceptorID, uint64_t &iMaxCommitedEntry);
+
+    int GetEntityMeta(uint64_t iEntityID, uint64_t &iMaxCommitedEntry,
+                      uint32_t &iFlag, const dbtype::Snapshot* poSnapshot);
+
+    // iFlag or iMaxCommitedEntry ignored if equals -1.
+    int SetEntityMeta(uint64_t iEntityID, uint64_t iMaxCommitedEntry,
+                      uint32_t iFlag = uint32_t(-1));
+
+    int MultiPut(dbtype::WriteBatch* oWB);
+
+    int GetBatch(uint64_t iEntityID, std::string& strNextKey, std::string* strWriteBatch,
+            const dbtype::Snapshot* poSnapshot,
+            uint32_t iMaxSize = 1024 * 1024);
+
+    int Clear(uint64_t iEntityID, std::string& strNextKey, uint32_t iMaxIterateKeyCnt = 1000);
+
+    int InsertSnapshot(uint64_t& iSequenceNumber, const dbtype::Snapshot* poSnapshot);
+
+    int FindSnapshot(uint64_t iSequenceNumber, const dbtype::Snapshot* poSnapshot);
+
+    void EraseSnapshot();
+
+    // Used by clsDBImplTest.
+    uint64_t GetSnapshotSize();
+
+    dbtype::DB *GetDB();
+};
+

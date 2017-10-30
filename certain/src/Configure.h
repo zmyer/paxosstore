@@ -234,7 +234,6 @@ private:
     string m_strFilePath;
 
     string m_strCertainPath;
-    string m_strPerfLogPath;
     string m_strLogPath;
 
     map<string, clsValueBase *> m_tKeyMap;
@@ -266,15 +265,13 @@ private:
     uint32_t m_iUseCertainLog;
     uint32_t m_iUseConsole;
     uint32_t m_iLogLevel;
-    uint32_t m_iUsePerfLog;
     uint32_t m_iCmdTimeoutMS;
     uint32_t m_iRecoverTimeoutMS;
     uint32_t m_iLocalAcceptFirst;
-    uint32_t m_iMaxEntityBitNum;
+    uint32_t m_iMaxEntityNum;
     uint32_t m_iMaxMemEntityNum;
     uint32_t m_iMaxMemEntryNum;
-    uint32_t m_iMaxLeaseMS;
-    uint32_t m_iMinLeaseMS;
+    uint32_t m_iLeaseDurationMS;
     uint32_t m_iEnableCheckSum;
     uint32_t m_iDBRoutineCnt;
     uint32_t m_iGetAllRoutineCnt;
@@ -284,16 +281,13 @@ private:
     uint32_t m_iEnableAutoFixEntry;
     uint32_t m_iGetAllMaxNum;
     uint32_t m_iEnableMaxPLogEntry;
-    uint32_t m_iEnableGetAllOnly;
     uint32_t m_iPLogRoutineCnt;
     uint32_t m_iIOReqTimeoutMS;
-    uint32_t m_iDBBatchCnt;
     uint32_t m_iPLogWriteQueueSize;
     uint32_t m_iPLogWriteWorkerNum;
     uint32_t m_iPLogWriteTimeoutUS;
     uint32_t m_iPLogWriteMaxNum;
     uint32_t m_iUsePLogWriteWorker;
-    uint32_t m_iUseDBBatch;
     uint32_t m_iWakeUpTimeoutUS;
     uint32_t m_iEnableTimeStat;
     uint32_t m_iMaxEmbedValueSize;
@@ -304,11 +298,10 @@ private:
     uint32_t m_iMaxCatchUpCnt;
     uint32_t m_iMaxMemCacheSizeMB;
     uint32_t m_iEnableConnectAll; // For compatable
-    uint32_t m_iUseIndexHash;
     uint32_t m_iRandomDropRatio;
+    uint32_t m_iPLogExpireTimeMS;
 
     vector<InetAddr_t> m_vecServerAddr;
-    InetAddr_t m_tExtAddr;
 
     int ParseByLine(string strLine, string &strKey, string &strValue);
     int SetByStringValue(clsValueBase *poValue, string strValue);
@@ -339,16 +332,16 @@ public:
         AssertEqual(LoadFromOption(iArgc, pArgv), 0);
     }
 
-   clsConfigure(const char *pcFilePath)
-   {
-       assert(pcFilePath != NULL);
-       m_strFilePath = pcFilePath;
+    clsConfigure(const char *pcFilePath)
+    {
+        assert(pcFilePath != NULL);
+        m_strFilePath = pcFilePath;
 
-       AssertEqual(AddVariables(), 0);
-       AssertEqual(LoadDefaultValue(), 0);
+        AssertEqual(AddVariables(), 0);
+        AssertEqual(LoadDefaultValue(), 0);
 
-       LoadFromFile(m_strFilePath.c_str());
-   }
+        LoadFromFile(m_strFilePath.c_str());
+    }
 
     int LoadFromOption(int iArgc, char *pArgv[]);
     int LoadFromFile(const char *pcFilePath = NULL);
@@ -386,15 +379,13 @@ public:
     UINT32_GET_SET(UseCertainLog);
     UINT32_GET_SET(UseConsole);
     UINT32_GET_SET(LogLevel);
-    UINT32_GET_SET(UsePerfLog);
     UINT32_GET_SET(CmdTimeoutMS);
     UINT32_GET_SET(RecoverTimeoutMS);
     UINT32_GET_SET(LocalAcceptFirst);
-    UINT32_GET_SET(MaxEntityBitNum);
+    UINT32_GET_SET(MaxEntityNum);
     UINT32_GET_SET(MaxMemEntityNum);
     UINT32_GET_SET(MaxMemEntryNum);
-    UINT32_GET_SET(MaxLeaseMS);
-    UINT32_GET_SET(MinLeaseMS);
+    UINT32_GET_SET(LeaseDurationMS);
     UINT32_GET_SET(EnableCheckSum);
     UINT32_GET_SET(DBRoutineCnt);
     UINT32_GET_SET(GetAllRoutineCnt);
@@ -404,16 +395,13 @@ public:
     UINT32_GET_SET(EnableAutoFixEntry);
     UINT32_GET_SET(GetAllMaxNum);
     UINT32_GET_SET(EnableMaxPLogEntry);
-    UINT32_GET_SET(EnableGetAllOnly);
     UINT32_GET_SET(PLogRoutineCnt);
     UINT32_GET_SET(IOReqTimeoutMS);
-    UINT32_GET_SET(DBBatchCnt);
     UINT32_GET_SET(PLogWriteWorkerNum);
     UINT32_GET_SET(PLogWriteQueueSize);
     UINT32_GET_SET(PLogWriteTimeoutUS);
     UINT32_GET_SET(PLogWriteMaxNum);
     UINT32_GET_SET(UsePLogWriteWorker);
-    UINT32_GET_SET(UseDBBatch);
     UINT32_GET_SET(WakeUpTimeoutUS);
     UINT32_GET_SET(EnableTimeStat);
     UINT32_GET_SET(MaxEmbedValueSize);
@@ -424,11 +412,10 @@ public:
     UINT32_GET_SET(MaxCatchUpCnt);
     UINT32_GET_SET(MaxMemCacheSizeMB);
     UINT32_GET_SET(EnableConnectAll);
-    UINT32_GET_SET(UseIndexHash);
     UINT32_GET_SET(RandomDropRatio);
+    UINT32_GET_SET(PLogExpireTimeMS);
 
     TYPE_GET_SET(string, CertainPath, strCertainPath);
-    TYPE_GET_SET(string, PerfLogPath, strPerfLogPath);
     TYPE_GET_SET(string, LogPath, strLogPath);
 
     //TYPE_GET_SET(vector<InetAddr_t>, ServerAddrs, vecServerAddr);
@@ -452,12 +439,9 @@ public:
                 continue;
             }
 
-            printf("%s replace %s\n", vecServerAddr[i].ToString().c_str(), m_vecServerAddr[i].ToString().c_str());
             m_vecServerAddr[i] = vecServerAddr[i];
         }
     }
-
-    TYPE_GET_SET(InetAddr_t, ExtAddr, tExtAddr);
 
     void LoadAgain();
 };

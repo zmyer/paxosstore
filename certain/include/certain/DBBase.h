@@ -1,7 +1,7 @@
 #ifndef CERTAIN_INCLUDE_CERTAIN_DB_BASE_H_
 #define CERTAIN_INCLUDE_CERTAIN_DB_BASE_H_
 
-#include "CertainUserBase.h"
+#include "certain/CertainUserBase.h"
 
 namespace Certain
 {
@@ -27,7 +27,7 @@ public:
 
     virtual int MultiCommit(vector<EntryValue_t> vecEntryValue) = 0;
 
-    virtual int LoadMaxCommitedEntry(uint64_t iEntityID,
+    virtual int GetEntityMeta(uint64_t iEntityID,
             uint64_t &iCommitedEntry, uint32_t &iFlag) = 0;
 
     virtual int GetAllAndSet(uint64_t iEntityID, uint32_t iAcceptorID,

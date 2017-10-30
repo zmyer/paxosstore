@@ -2,7 +2,6 @@
 #define CERTAIN_INCLUDE_CERTAIN_USER_BASE_H_
 
 #include "Command.h"
-#include "PerfLog.h"
 #include "AsyncPipeMng.h"
 #include "AsyncQueueMng.h"
 #include "UUIDGroupMng.h"

@@ -1,37 +1,60 @@
-# certain
+# Certain
 
-Certain is an asynchronous implementation of paxos log.
+Certain is an asynchronous implementation of paxos log, but using in synchronous way is supported. And It's widely used in WeChat backend as the base of building distributed system that both high availability and strong consistency are required.
 
-# build simple_srv and simple_cli
+# Build example
 
-	1) sh third/autobuild.sh;
+The example is a simple card server with full neccesary functions implemetation, such as routing, failover, getall and plog expiring. It's based on gRPC, which allows you to access by clients of different language easily.
 
-	2) make -j 4 example;
+    $ sh autobuild.sh example
 
-# play
+# Have a try on the example
 
-For server:
+    Make a directory for the servers first, for example:
 
-	Use '-i' and 'e' to override LocalAcceptorID and ExtEndpoint in the configure.
-	If AcceptorNum is 3 in certain.conf, each server(process) run as:
+    $ mkdir /home/rockzheng/certain
 
-	./simple_srv -c example/example.conf -i 0 -e 127.0.0.1:38240 &
+    Run three servers, you could see they listen on diffent port for the client.
+    Exactly speaking, 5005x is for card_srv_x, of which x is 0, 1, or 2.
 
-	./simple_srv -c example/example.conf -i 1 -e 127.0.0.1:38241 &
+    $ ./card_srv -c example/example.conf -p /home/rockzheng/certain -i 0 &
+    $ ./card_srv -c example/example.conf -p /home/rockzheng/certain -i 1 &
+    $ ./card_srv -c example/example.conf -p /home/rockzheng/certain -i 2 &
 
-	./simple_srv -c example/example.conf -i 2 -e 127.0.0.1:38242 &
+    Use card_tool to do some operations, like Insert/Delete/Update/Select.
 
-For client:
+    $ ./card_tool
+        ./CardTool -X/-Y/-Z addr -o Insert -i <card_id> -n <user_name> -u <user_id> -b <balance>
+        ./CardTool -X/-Y/-Z addr -o Update -i <card_id> -d <delta>
+        ./CardTool -X/-Y/-Z addr -o Delete -i <card_id>
+        ./CardTool -X/-Y/-Z addr -o Select -i <card_id>
+        ./CardTool -a       addr -o Recover -i <card_id>
 
-	~>./simple_cli 127.0.0.1 38240
+    $ ./card_tool -X 127.0.0.1:50050 -o Insert -i 12358 -n rock -u 20170001 -b 200
+        Failure with error: code(8002) msg(card exists)
 
-    Get xxx
-    cmd: cmd 3 uuid 409927680 E(560266, 1) scmd 1 key xxx val.size 0 val  ret -7000 // Not Found
+    $ ./card_tool -X 127.0.0.1:50050 -o Select -i 12358
+        user_name=rock user_id=20170001 balance=200
+        Done
 
-    Set xxx yyy
-    cmd: cmd 3 uuid 409927682 E(560266, 1) scmd 2 key xxx val.size 3 val yyy ret 0 // OK
+    $ ./card_tool -X 127.0.0.1:50050 -o Update -i 12358 -d 10
+        balance=210
+        Done
 
-    Get xxx
-    cmd: cmd 3 uuid 409927683 E(560266, 2) scmd 1 key xxx val.size 3 val yyy ret 0 // OK
+    $ ./card_tool -X 127.0.0.1:50050 -o Delete -i 12358
+        Done
 
-To have fun, you may kill some of them, and then restart.
+    $ ./card_tool -X 127.0.0.1:50050 -o Select -i 12358
+        Failure with error: code(8001) msg(card not exist)
+
+    Trigger GetAll/CatchUp when data is lost.
+
+    $ ./card_tool -X 127.0.0.1:50050 -o Insert -i 12358 -n rock -u 20170001 -b 200
+        Failure with error: code(8002) msg(card exists)
+
+    $ rm /home/rockzheng/certain/datadb_0 -rf
+    $ rm /home/rockzheng/certain/logdb_0 -rf
+
+    $ ./card_tool -X 127.0.0.1:50050 -o Select -i 12358
+        user_name=rock user_id=20170001 balance=200
+        Done

@@ -141,7 +141,7 @@ int clsConfigure::LoadFromOption(int iArgc, char *pArgv[])
     optind = 1;
 
     // The configures parsed here must not occur in UpdateConf.
-    while ((opt = getopt(iArgc, pArgv, "c:l:n:i:a:e:s:")) != -1)
+    while ((opt = getopt(iArgc, pArgv, "c:p:i:")) != -1)
     {
         switch(opt)
         {
@@ -149,32 +149,13 @@ int clsConfigure::LoadFromOption(int iArgc, char *pArgv[])
                 m_strFilePath = optarg;
                 break;
 
-            case 'l':
-                m_strLogPath = optarg;
-                break;
-
-            case 'n':
-                poValue = m_tKeyMap["AcceptorNum"];
-                poValue->Parse(optarg);
+            case 'p':
+                m_strCertainPath = optarg;
                 break;
 
             case 'i':
                 poValue = m_tKeyMap["LocalServerID"];
                 poValue->Parse(optarg);
-                break;
-
-            case 'a':
-                poValue = m_tKeyMap["ServerAddrs"];
-                iRet = poValue->Parse(optarg);
-                break;
-
-            case 'e':
-                poValue = m_tKeyMap["ExtAddr"];
-                poValue->Parse(optarg);
-                break;
-
-            case 's':
-                s_strConfSuffix = optarg;
                 break;
         }
 
@@ -238,11 +219,11 @@ int clsConfigure::AddVariables()
     ADD_UINT32(PLogWorkerNum, 1);
     ADD_UINT32(DBWorkerNum, 1);
     ADD_UINT32(GetAllWorkerNum, 1);
-    ADD_UINT32(IOQueueSize, 10000);
+    ADD_UINT32(IOQueueSize, 2000);
     ADD_UINT32(PLogQueueSize, 2000);
     ADD_UINT32(DBQueueSize, 2000);
-    ADD_UINT32(CatchUpQueueSize, 100000);
-    ADD_UINT32(GetAllQueueSize, 400000);
+    ADD_UINT32(CatchUpQueueSize, 10000);
+    ADD_UINT32(GetAllQueueSize, 40000);
     ADD_UINT32(IntConnLimit, 1);
     ADD_UINT32(EnablePreAuth, 1);
     ADD_UINT32(MaxCatchUpSpeedKB, 4096);
@@ -252,15 +233,13 @@ int clsConfigure::AddVariables()
     ADD_UINT32(UseCertainLog, 1);
     ADD_UINT32(UseConsole, 0);
     ADD_UINT32(LogLevel, 4);
-    ADD_UINT32(UsePerfLog, 0);
     ADD_UINT32(CmdTimeoutMS, 1000);
     ADD_UINT32(RecoverTimeoutMS, 1000);
     ADD_UINT32(LocalAcceptFirst, 0);
-    ADD_UINT32(MaxEntityBitNum, 64);
-    ADD_UINT32(MaxMemEntityNum, 10000000);
-    ADD_UINT32(MaxMemEntryNum, 5000000);
-    ADD_UINT32(MaxLeaseMS, 0);
-    ADD_UINT32(MinLeaseMS, 0);
+    ADD_UINT32(MaxEntityNum, 1000000);
+    ADD_UINT32(MaxMemEntityNum, 2000000);
+    ADD_UINT32(MaxMemEntryNum, 200000);
+    ADD_UINT32(LeaseDurationMS, 10);
     ADD_UINT32(EnableCheckSum, 0);
     ADD_UINT32(DBRoutineCnt, 5);
     ADD_UINT32(GetAllRoutineCnt, 5);
@@ -269,17 +248,13 @@ int clsConfigure::AddVariables()
     ADD_UINT32(EnableAutoFixEntry, 0);
     ADD_UINT32(GetAllMaxNum, 0);
     ADD_UINT32(EnableMaxPLogEntry, 0);
-    ADD_UINT32(EnableGetAllOnly, 0);
     ADD_UINT32(PLogRoutineCnt, 5);
     ADD_UINT32(IOReqTimeoutMS, 0);
     ADD_UINT32(FlushTimeoutUS, 100);
 
-    ADD_UINT32(UseDBBatch, 0);
-    ADD_UINT32(DBBatchCnt, 20);
-
     ADD_UINT32(UsePLogWriteWorker, 0);
     ADD_UINT32(PLogWriteWorkerNum, 2);
-    ADD_UINT32(PLogWriteQueueSize, 100000);
+    ADD_UINT32(PLogWriteQueueSize, 10000);
     ADD_UINT32(PLogWriteTimeoutUS, 100);
     ADD_UINT32(PLogWriteMaxNum, 100);
 
@@ -299,20 +274,16 @@ int clsConfigure::AddVariables()
 
     ADD_UINT32(EnableConnectAll, 1);
 
-    ADD_UINT32(UseIndexHash, 0);
-
     ADD_UINT32(RandomDropRatio, 0);
 
+    ADD_UINT32(PLogExpireTimeMS, (24 * 3600 * 1000));
+
     AddString(m_strCertainPath, "CertainPath", "/home/rockzheng/certain");
-    AddString(m_strPerfLogPath, "PerfLogPath", "/home/rockzheng/certain/perflog");
     AddString(m_strLogPath, "LogPath", "/home/rockzheng/certain/log");
 
     vector<InetAddr_t> vecDefault;
     AddInetAddrs(m_vecServerAddr, "ServerAddrs",
             vecDefault);
-
-    InetAddr_t tDefaultExtAddr;
-    AddInetAddr(m_tExtAddr, "ExtAddr", tDefaultExtAddr);
 
     return 0;
 }
@@ -363,18 +334,13 @@ void clsConfigure::UpdateConf(clsConfigure *poNewConf)
     UPDATE_UINT32_CONF(MaxCatchUpConcurr);
     UPDATE_UINT32_CONF(MaxMemEntityNum);
     UPDATE_UINT32_CONF(FlushTimeoutUS);
-    UPDATE_UINT32_CONF(MaxLeaseMS);
-    UPDATE_UINT32_CONF(MinLeaseMS);
+    UPDATE_UINT32_CONF(LeaseDurationMS);
     UPDATE_UINT32_CONF(EnableAutoFixEntry);
     UPDATE_UINT32_CONF(GetAllMaxNum);
     UPDATE_UINT32_CONF(EnableMaxPLogEntry);
-    UPDATE_UINT32_CONF(EnableGetAllOnly);
     UPDATE_UINT32_CONF(CmdTimeoutMS);
     UPDATE_UINT32_CONF(RecoverTimeoutMS);
     UPDATE_UINT32_CONF(IOReqTimeoutMS);
-
-    UPDATE_UINT32_CONF(UseDBBatch);
-    UPDATE_UINT32_CONF(DBBatchCnt);
 
     UPDATE_UINT32_CONF(UsePLogWriteWorker);
     UPDATE_UINT32_CONF(PLogWriteTimeoutUS);
@@ -394,7 +360,6 @@ void clsConfigure::UpdateConf(clsConfigure *poNewConf)
 
     UPDATE_UINT32_CONF(MaxMemCacheSizeMB);
     UPDATE_UINT32_CONF(EnableConnectAll);
-    UPDATE_UINT32_CONF(UseIndexHash);
 
     UPDATE_UINT32_CONF(RandomDropRatio);
 }

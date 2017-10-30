@@ -9,31 +9,28 @@ namespace Certain
 {
 
 #define NO_COPYING_ALLOWED(cls) \
-	cls(const cls &); \
-	void operator = (const cls &);
+    cls(const cls &); \
+    void operator = (const cls &);
 
 #define TYPE_GET_SET(type, name, tname) \
-	const type &Get##name() { return m_##tname; } \
-	void Set##name(const type &tname) { m_##tname = tname; }
+    const type &Get##name() { return m_##tname; } \
+    void Set##name(const type &tname) { m_##tname = tname; }
 
 #define UINT32_GET_SET(var) TYPE_GET_SET(uint32_t, var, i##var)
 
 #define POINTER_GET_SET(type, name, tname) \
-	type *Get##name() { return m_##tname; } \
-	void Set##name(type *tname) { m_##tname = tname; }
+    type *Get##name() { return m_##tname; } \
+    void Set##name(type *tname) { m_##tname = tname; }
 
 #define BOOLEN_IS_SET(name) \
-	const bool &Is##name() { return m_b##name; } \
-	void Set##name(const bool &b##name) { m_b##name = b##name; }
-
-#define TEST_CASE_FINISH() \
-	fprintf(stderr, "%s finished!\n", __FUNCTION__);
+    const bool &Is##name() { return m_b##name; } \
+    void Set##name(const bool &b##name) { m_b##name = b##name; }
 
 #define RETURN_RANDOM_ERROR_WHEN_IN_DEBUG_MODE() \
-	static __thread clsRandom *__poRandom = new clsRandom(uint32_t(pthread_self())); \
-	if (__poRandom->Next() % 10 == 0) { \
-		return -7999; \
-	}
+    static __thread clsRandom *__poRandom = new clsRandom(uint32_t(pthread_self())); \
+    if (__poRandom->Next() % 10 == 0) { \
+        return -7999; \
+    }
 
 template<typename Type>
 class clsAutoDelete
@@ -44,17 +41,6 @@ private:
 public:
     clsAutoDelete(Type *pType) : m_pType(pType) { }
     ~clsAutoDelete() { delete m_pType, m_pType = NULL; }
-};
-
-template<typename Type>
-class clsAutoFree
-{
-private:
-    Type *m_pType;
-
-public:
-    clsAutoFree(Type *pType) : m_pType(pType) { }
-    ~clsAutoFree() { delete m_pType, m_pType = NULL; }
 };
 
 template<typename Type>

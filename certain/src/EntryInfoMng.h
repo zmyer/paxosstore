@@ -18,10 +18,10 @@ template<>
 
 } // namespace std
 
+#define CERTAIN_MAX_ENTRY_TIMEOUT_MS 30000 // 30s
+
 namespace Certain
 {
-
-#define MAX_ENTRY_TIMEOUT_MS 30000 // 30s
 
 class clsConfigure;
 class clsCmdBase;
@@ -33,9 +33,8 @@ struct EntryInfo_t
     EntityInfo_t *ptEntityInfo;
     uint64_t iEntry;
 
-    // (TODO)rock: maintain in EntityInfo_t
-    uint32_t iActiveAcceptorID;
     uint32_t iEntrySize;
+    uint32_t iInteractCnt;
 
     bool bCatchUpFlag;
     bool bUncertain;
@@ -95,12 +94,12 @@ public:
         bool bAutoEliminate = false;
         m_poEntryTable = new EntryLRUTable_t(iMaxEntryNum, bAutoEliminate);
 
-        m_poEntryTimer = new clsArrayTimer<EntryInfo_t>(MAX_ENTRY_TIMEOUT_MS);
+        m_poEntryTimer = new clsArrayTimer<EntryInfo_t>(CERTAIN_MAX_ENTRY_TIMEOUT_MS);
 
         m_poFixSizePool = new clsFixSizePool(iMaxEntryNum, sizeof(EntryInfo_t));
 
-        CertainLogImpt("iMaxEntryNum %u MAX_ENTRY_TIMEOUT_MS %d",
-                iMaxEntryNum, MAX_ENTRY_TIMEOUT_MS);
+        CertainLogImpt("iMaxEntryNum %u CERTAIN_MAX_ENTRY_TIMEOUT_MS %d",
+                iMaxEntryNum, CERTAIN_MAX_ENTRY_TIMEOUT_MS);
     }
 
     ~clsEntryInfoMng()
